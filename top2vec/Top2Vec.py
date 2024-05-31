@@ -915,24 +915,35 @@ class Top2Vec:
 
             self.topic_vectors = unique_topics
 
-    def _calculate_topic_sizes(self, hierarchy=False):
+    def _calculate_topic_sizes(self, hierarchy=False, reduction_level=1):
         if hierarchy:
-            topic_sizes = pd.Series(self.doc_top_reduced).value_counts()
+            if reduction_level==1:
+                topic_sizes = pd.Series(self.doc_top_reduced).value_counts()
+            else:
+                topic_sizes = pd.Series(self.doc_top_reduced_lv2).value_counts()
         else:
             topic_sizes = pd.Series(self.doc_top).value_counts()
 
         return topic_sizes
 
-    def _reorder_topics(self, hierarchy=False):
-
+    def _reorder_topics(self, hierarchy=False,reduction_level=1):
         if hierarchy:
-            self.topic_vectors_reduced = self.topic_vectors_reduced[self.topic_sizes_reduced.index]
-            self.topic_words_reduced = self.topic_words_reduced[self.topic_sizes_reduced.index]
-            self.topic_word_scores_reduced = self.topic_word_scores_reduced[self.topic_sizes_reduced.index]
-            old2new = dict(zip(self.topic_sizes_reduced.index, range(self.topic_sizes_reduced.index.shape[0])))
-            self.doc_top_reduced = np.array([old2new[i] for i in self.doc_top_reduced])
-            self.hierarchy = [self.hierarchy[i] for i in self.topic_sizes_reduced.index]
-            self.topic_sizes_reduced.reset_index(drop=True, inplace=True)
+            if reduction_level==1:
+                self.topic_vectors_reduced = self.topic_vectors_reduced[self.topic_sizes_reduced.index]
+                self.topic_words_reduced = self.topic_words_reduced[self.topic_sizes_reduced.index]
+                self.topic_word_scores_reduced = self.topic_word_scores_reduced[self.topic_sizes_reduced.index]
+                old2new = dict(zip(self.topic_sizes_reduced.index, range(self.topic_sizes_reduced.index.shape[0])))
+                self.doc_top_reduced = np.array([old2new[i] for i in self.doc_top_reduced])
+                self.hierarchy = [self.hierarchy[i] for i in self.topic_sizes_reduced.index]
+                self.topic_sizes_reduced.reset_index(drop=True, inplace=True)
+            else: 
+                self.topic_vectors_reduced_lv2 = self.topic_vectors_reduced_lv2[self.topic_sizes_reduced_lv2.index]
+                self.topic_words_reduced_lv2 = self.topic_words_reduced_lv2[self.topic_sizes_reduced_lv2.index]
+                self.topic_word_scores_reduced_lv2 = self.topic_word_scores_reduced_lv2[self.topic_sizes_reduced_lv2.index]
+                old2new = dict(zip(self.topic_sizes_reduced_lv2.index, range(self.topic_sizes_reduced_lv2.index.shape[0])))
+                self.doc_top_reduced_lv2 = np.array([old2new[i] for i in self.doc_top_reduced_lv2])
+                self.hierarchy_lv2 = [self.hierarchy_lv2[i] for i in self.topic_sizes_reduced_lv2.index]
+                self.topic_sizes_reduced_lv2.reset_index(drop=True, inplace=True)
         else:
             self.topic_vectors = self.topic_vectors[self.topic_sizes.index]
             self.topic_words = self.topic_words[self.topic_sizes.index]
@@ -940,6 +951,7 @@ class Top2Vec:
             old2new = dict(zip(self.topic_sizes.index, range(self.topic_sizes.index.shape[0])))
             self.doc_top = np.array([old2new[i] for i in self.doc_top])
             self.topic_sizes.reset_index(drop=True, inplace=True)
+
 
     @staticmethod
     def _calculate_documents_topic(topic_vectors,
@@ -1032,21 +1044,35 @@ class Top2Vec:
 
         return topic_words, topic_word_scores
 
-    def _assign_documents_to_topic(self, document_vectors, hierarchy=False):
+    def _assign_documents_to_topic(self, document_vectors, hierarchy=False, reduction_level=1):
 
         if hierarchy:
-            doc_top_new, doc_dist_new = self._calculate_documents_topic(self.topic_vectors_reduced,
-                                                                        document_vectors,
-                                                                        dist=True)
+            if reduction_level==1:
+                doc_top_new, doc_dist_new = self._calculate_documents_topic(self.topic_vectors_reduced,
+                                                                            document_vectors,
+                                                                            dist=True)
 
-            self.doc_top_reduced = np.array(list(self.doc_top_reduced) + list(doc_top_new))
-            self.doc_dist_reduced = np.array(list(self.doc_dist_reduced) + list(doc_dist_new))
+                self.doc_top_reduced = np.array(list(self.doc_top_reduced) + list(doc_top_new))
+                self.doc_dist_reduced = np.array(list(self.doc_dist_reduced) + list(doc_dist_new))
 
-            topic_sizes_new = pd.Series(doc_top_new).value_counts()
-            for top in topic_sizes_new.index.tolist():
-                self.topic_sizes_reduced[top] += topic_sizes_new[top]
-            self.topic_sizes_reduced.sort_values(ascending=False, inplace=True)
-            self._reorder_topics(hierarchy)
+                topic_sizes_new = pd.Series(doc_top_new).value_counts()
+                for top in topic_sizes_new.index.tolist():
+                    self.topic_sizes_reduced[top] += topic_sizes_new[top]
+                self.topic_sizes_reduced.sort_values(ascending=False, inplace=True)
+                self._reorder_topics(hierarchy)
+            else: 
+                doc_top_new, doc_dist_new = self._calculate_documents_topic(self.topic_vectors_reduced_lv2,
+                                                                            document_vectors,
+                                                                            dist=True)
+
+                self.doc_top_reduced_lv2 = np.array(list(self.doc_top_reduced_lv2) + list(doc_top_new))
+                self.doc_dist_reduced_lv2 = np.array(list(self.doc_dist_reduced_lv2) + list(doc_dist_new))
+
+                topic_sizes_new = pd.Series(doc_top_new).value_counts()
+                for top in topic_sizes_new.index.tolist():
+                    self.topic_sizes_reduced_lv2[top] += topic_sizes_new[top]
+                self.topic_sizes_reduced_lv2.sort_values(ascending=False, inplace=True)
+                self._reorder_topics(hierarchy, reduction_level=2)
         else:
             doc_top_new, doc_dist_new = self._calculate_documents_topic(self.topic_vectors, document_vectors, dist=True)
             self.doc_top = np.array(list(self.doc_top) + list(doc_top_new))
@@ -1058,16 +1084,26 @@ class Top2Vec:
             self.topic_sizes.sort_values(ascending=False, inplace=True)
             self._reorder_topics(hierarchy)
 
-    def _unassign_documents_from_topic(self, doc_indexes, hierarchy=False):
+    def _unassign_documents_from_topic(self, doc_indexes, hierarchy=False, reduction_level=1):
         if hierarchy:
-            doc_top_remove = self.doc_top_reduced[doc_indexes]
-            self.doc_top_reduced = np.delete(self.doc_top_reduced, doc_indexes, 0)
-            self.doc_dist_reduced = np.delete(self.doc_dist_reduced, doc_indexes, 0)
-            topic_sizes_remove = pd.Series(doc_top_remove).value_counts()
-            for top in topic_sizes_remove.index.tolist():
-                self.topic_sizes_reduced[top] -= topic_sizes_remove[top]
-            self.topic_sizes_reduced.sort_values(ascending=False, inplace=True)
-            self._reorder_topics(hierarchy)
+            if reduction_level==1:
+                doc_top_remove = self.doc_top_reduced[doc_indexes]
+                self.doc_top_reduced = np.delete(self.doc_top_reduced, doc_indexes, 0)
+                self.doc_dist_reduced = np.delete(self.doc_dist_reduced, doc_indexes, 0)
+                topic_sizes_remove = pd.Series(doc_top_remove).value_counts()
+                for top in topic_sizes_remove.index.tolist():
+                    self.topic_sizes_reduced[top] -= topic_sizes_remove[top]
+                self.topic_sizes_reduced.sort_values(ascending=False, inplace=True)
+                self._reorder_topics(hierarchy)
+            else: 
+                doc_top_remove = self.doc_top_reduced_lv2[doc_indexes]
+                self.doc_top_reduced_lv2 = np.delete(self.doc_top_reduced_lv2, doc_indexes, 0)
+                self.doc_dist_reduced_lv2 = np.delete(self.doc_dist_reduced_lv2, doc_indexes, 0)
+                topic_sizes_remove = pd.Series(doc_top_remove).value_counts()
+                for top in topic_sizes_remove.index.tolist():
+                    self.topic_sizes_reduced_lv2[top] -= topic_sizes_remove[top]
+                self.topic_sizes_reduced_lv2.sort_values(ascending=False, inplace=True)
+                self._reorder_topics(hierarchy, reduction_level=2)
         else:
             doc_top_remove = self.doc_top[doc_indexes]
             self.doc_top = np.delete(self.doc_top, doc_indexes, 0)
@@ -1181,14 +1217,21 @@ class Top2Vec:
         if num < 0:
             raise ValueError(f"{var_name} cannot be less than 0.")
 
-    def _validate_hierarchical_reduction(self):
-        if self.hierarchy is None:
+    def _validate_hierarchical_reduction(self, reduction_level=1):
+        if self.hierarchy is None and reduction_level==1:
             raise ValueError("Hierarchical topic reduction has not been performed.")
+        elif self.hierarchy_lv2 is None and reduction_level==2:
+            raise ValueError("Hierarchical topic reduction for level 2 has not been performed.")
 
-    def _validate_hierarchical_reduction_num_topics(self, num_topics):
-        current_num_topics = len(self.topic_vectors)
-        if num_topics >= current_num_topics:
-            raise ValueError(f"Number of topics must be less than {current_num_topics}.")
+    def _validate_hierarchical_reduction_num_topics(self, num_topics, reduction_level=1):
+        if reduction_level == 1:
+            current_num_topics = len(self.topic_vectors)
+            if num_topics >= current_num_topics:
+                raise ValueError(f"Number of topics must be less than {current_num_topics}.")
+        else: 
+            current_num_topics = len(self.topic_vectors_reduced)
+            if num_topics >= current_num_topics:
+                raise ValueError(f"Number of topics must be less than {current_num_topics}.")
 
     def _validate_num_docs(self, num_docs):
         self._less_than_zero(num_docs, "num_docs")
@@ -1196,35 +1239,50 @@ class Top2Vec:
         if num_docs > document_count:
             raise ValueError(f"num_docs cannot exceed the number of documents: {document_count}.")
 
-    def _validate_num_topics(self, num_topics, reduced):
+    def _validate_num_topics(self, num_topics, reduced, reduction_level=1):
         self._less_than_zero(num_topics, "num_topics")
         if reduced:
-            topic_count = len(self.topic_vectors_reduced)
-            if num_topics > topic_count:
-                raise ValueError(f"num_topics cannot exceed the number of reduced topics: {topic_count}.")
+            if reduction_level==1:
+                topic_count = len(self.topic_vectors_reduced)
+                if num_topics > topic_count:
+                    raise ValueError(f"num_topics cannot exceed the number of reduced topics: {topic_count}.")
+            else: 
+                topic_count = len(self.topic_vectors_reduced_lv2)
+                if num_topics > topic_count:
+                    raise ValueError(f"num_topics cannot exceed the number of reduced topics: {topic_count}.")
         else:
             topic_count = len(self.topic_vectors)
             if num_topics > topic_count:
                 raise ValueError(f"num_topics cannot exceed the number of topics: {topic_count}.")
 
-    def _validate_topic_num(self, topic_num, reduced):
+    def _validate_topic_num(self, topic_num, reduced, reduction_level=1):
         self._less_than_zero(topic_num, "topic_num")
 
         if reduced:
-            topic_count = len(self.topic_vectors_reduced) - 1
-            if topic_num > topic_count:
-                raise ValueError(f"Invalid topic number: valid reduced topics numbers are 0 to {topic_count}.")
+            if reduction_level==1:
+                topic_count = len(self.topic_vectors_reduced) - 1
+                if topic_num > topic_count:
+                    raise ValueError(f"Invalid topic number: valid reduced topics numbers are 0 to {topic_count}.")
+            else: 
+                topic_count = len(self.topic_vectors_reduced_lv2) - 1
+                if topic_num > topic_count:
+                    raise ValueError(f"Invalid topic number: valid reduced topics numbers are 0 to {topic_count}.")
         else:
             topic_count = len(self.topic_vectors) - 1
             if topic_num > topic_count:
                 raise ValueError(f"Invalid topic number: valid original topics numbers are 0 to {topic_count}.")
 
-    def _validate_topic_search(self, topic_num, num_docs, reduced):
+    def _validate_topic_search(self, topic_num, num_docs, reduced, reduction_level=1):
         self._less_than_zero(num_docs, "num_docs")
         if reduced:
-            if num_docs > self.topic_sizes_reduced[topic_num]:
-                raise ValueError(f"Invalid number of documents: reduced topic {topic_num}"
-                                 f" only has {self.topic_sizes_reduced[topic_num]} documents.")
+            if reduction_level==1:
+                if num_docs > self.topic_sizes_reduced[topic_num]:
+                    raise ValueError(f"Invalid number of documents: reduced topic {topic_num}"
+                                    f" only has {self.topic_sizes_reduced[topic_num]} documents.")
+            else:
+                if num_docs > self.topic_sizes_reduced_lv2[topic_num]:
+                    raise ValueError(f"Invalid number of documents: reduced topic {topic_num}"
+                                    f" only has {self.topic_sizes_reduced_lv2[topic_num]} documents.")
         else:
             if num_docs > self.topic_sizes[topic_num]:
                 raise ValueError(f"Invalid number of documents: original topic {topic_num}"
@@ -1424,6 +1482,13 @@ class Top2Vec:
         self.topic_words_reduced = None
         self.topic_word_scores_reduced = None
         self.hierarchy = None
+        self.topic_vectors_reduced_lv2 = None
+        self.doc_top_reduced_lv2 = None
+        self.doc_dist_reduced_lv2 = None
+        self.topic_sizes_reduced_lv2 = None
+        self.topic_words_reduced_lv2 = None
+        self.topic_word_scores_reduced_lv2 = None
+        self.hierarchy_lv2 = None
 
     def index_document_vectors(self, ef_construction=200, M=64):
         """
@@ -1582,7 +1647,7 @@ class Top2Vec:
         """
         self.embedding_model_path = None
 
-    def get_documents_topics(self, doc_ids, reduced=False, num_topics=1):
+    def get_documents_topics(self, doc_ids, reduced=False, num_topics=1, reduction_level=1):
         """
         Get document topics.
 
@@ -1644,10 +1709,16 @@ class Top2Vec:
 
         if num_topics == 1:
             if reduced:
-                doc_topics = self.doc_top_reduced[doc_indexes]
-                doc_dist = self.doc_dist_reduced[doc_indexes]
-                topic_words = self.topic_words_reduced[doc_topics]
-                topic_word_scores = self.topic_word_scores_reduced[doc_topics]
+                if reduction_level==1:
+                    doc_topics = self.doc_top_reduced[doc_indexes]
+                    doc_dist = self.doc_dist_reduced[doc_indexes]
+                    topic_words = self.topic_words_reduced[doc_topics]
+                    topic_word_scores = self.topic_word_scores_reduced[doc_topics]
+                else: 
+                    doc_topics = self.doc_top_reduced_lv2[doc_indexes]
+                    doc_dist = self.doc_dist_reduced_lv2[doc_indexes]
+                    topic_words = self.topic_words_reduced_lv2[doc_topics]
+                    topic_word_scores = self.topic_word_scores_reduced_lv2[doc_topics]
             else:
                 doc_topics = self.doc_top[doc_indexes]
                 doc_dist = self.doc_dist[doc_indexes]
@@ -1656,16 +1727,31 @@ class Top2Vec:
 
         else:
             if reduced:
-                topic_vectors = self.topic_vectors_reduced
+                if reduction_level==1:
+                    topic_vectors = self.topic_vectors_reduced
+                    doc_topics, doc_dist = self._calculate_documents_topic(topic_vectors,
+                                                                    self.document_vectors[doc_indexes],
+                                                                    num_topics=num_topics)
+
+                    topic_words = np.array([self.topic_words_reduced[topics] for topics in doc_topics])
+                    topic_word_scores = np.array([self.topic_word_scores_reduced[topics] for topics in doc_topics])
+                else: 
+                    topic_vectors = self.topic_vectors_reduced_lv2
+                    doc_topics, doc_dist = self._calculate_documents_topic(topic_vectors,
+                                                                    self.document_vectors[doc_indexes],
+                                                                    num_topics=num_topics)
+
+                    topic_words = np.array([self.topic_words_reduced_lv2[topics] for topics in doc_topics])
+                    topic_word_scores = np.array([self.topic_word_scores_reduced_lv2[topics] for topics in doc_topics])
             else:
                 topic_vectors = self.topic_vectors
 
-            doc_topics, doc_dist = self._calculate_documents_topic(topic_vectors,
-                                                                   self.document_vectors[doc_indexes],
-                                                                   num_topics=num_topics)
+                doc_topics, doc_dist = self._calculate_documents_topic(topic_vectors,
+                                                                    self.document_vectors[doc_indexes],
+                                                                    num_topics=num_topics)
 
-            topic_words = np.array([self.topic_words[topics] for topics in doc_topics])
-            topic_word_scores = np.array([self.topic_word_scores[topics] for topics in doc_topics])
+                topic_words = np.array([self.topic_words[topics] for topics in doc_topics])
+                topic_word_scores = np.array([self.topic_word_scores[topics] for topics in doc_topics])
 
         return doc_topics, doc_dist, topic_words, topic_word_scores
 
@@ -1831,7 +1917,7 @@ class Top2Vec:
         if self.hierarchy is not None:
             self._unassign_documents_from_topic(doc_indexes, hierarchy=True)
 
-    def get_num_topics(self, reduced=False):
+    def get_num_topics(self, reduced=False, reduction_level=1):
         """
         Get number of topics.
 
@@ -1851,12 +1937,16 @@ class Top2Vec:
         """
 
         if reduced:
-            self._validate_hierarchical_reduction()
-            return len(self.topic_vectors_reduced)
+            if reduction_level==1: 
+                self._validate_hierarchical_reduction()
+                return len(self.topic_vectors_reduced)
+            else: 
+                self._validate_hierarchical_reduction(reduction_level=2)
+                return len(self.topic_vectors_reduced_lv2)
         else:
             return len(self.topic_vectors)
 
-    def get_topic_sizes(self, reduced=False):
+    def get_topic_sizes(self, reduced=False, reduction_level=1):
         """
         Get topic sizes.
 
@@ -1880,12 +1970,16 @@ class Top2Vec:
             The unique number of every topic will be returned.
         """
         if reduced:
-            self._validate_hierarchical_reduction()
-            return np.array(self.topic_sizes_reduced.values), np.array(self.topic_sizes_reduced.index)
+            if reduction_level==1: 
+                self._validate_hierarchical_reduction()
+                return np.array(self.topic_sizes_reduced.values), np.array(self.topic_sizes_reduced.index)
+            else: 
+                self._validate_hierarchical_reduction(reduction_level=2)
+                return np.array(self.topic_sizes_reduced_lv2.values), np.array(self.topic_sizes_reduced_lv2.index)
         else:
             return np.array(self.topic_sizes.values), np.array(self.topic_sizes.index)
 
-    def get_topics(self, num_topics=None, reduced=False):
+    def get_topics(self, num_topics=None, reduced=False, reduction_level=1):
         """
         Get topics, ordered by decreasing size. All topics are returned
         if num_topics is not specified.
@@ -1931,15 +2025,26 @@ class Top2Vec:
             The unique number of every topic will be returned.
         """
         if reduced:
-            self._validate_hierarchical_reduction()
+            if reduction_level==1:
+                self._validate_hierarchical_reduction()
 
-            if num_topics is None:
-                num_topics = len(self.topic_vectors_reduced)
-            else:
-                self._validate_num_topics(num_topics, reduced)
+                if num_topics is None:
+                    num_topics = len(self.topic_vectors_reduced)
+                else:
+                    self._validate_num_topics(num_topics, reduced)
 
-            return self.topic_words_reduced[0:num_topics], self.topic_word_scores_reduced[0:num_topics], np.array(
-                range(0, num_topics))
+                return self.topic_words_reduced[0:num_topics], self.topic_word_scores_reduced[0:num_topics], np.array(
+                    range(0, num_topics))
+            else: 
+                self._validate_hierarchical_reduction(reduction_level=2)
+
+                if num_topics is None:
+                    num_topics = len(self.topic_vectors_reduced_lv2)
+                else:
+                    self._validate_num_topics(num_topics, reduced, reduction_level=2)
+
+                return self.topic_words_reduced_lv2[0:num_topics], self.topic_word_scores_reduced_lv2[0:num_topics], np.array(
+                    range(0, num_topics))
         else:
 
             if num_topics is None:
@@ -1949,7 +2054,7 @@ class Top2Vec:
 
             return self.topic_words[0:num_topics], self.topic_word_scores[0:num_topics], np.array(range(0, num_topics))
 
-    def get_topic_hierarchy(self):
+    def get_topic_hierarchy(self, reduction_level=1):
         """
         Get the hierarchy of reduced topics. The mapping of each original topic
         to the reduced topics is returned.
@@ -1970,10 +2075,12 @@ class Top2Vec:
             [0,1] <Reduced Topic 3> contains original Topics 0 and 1
             ...]
         """
-
-        self._validate_hierarchical_reduction()
-
-        return self.hierarchy
+        if reduction_level==1:
+            self._validate_hierarchical_reduction()
+            return self.hierarchy
+        else: 
+            self._validate_hierarchical_reduction(reduction_level=2)
+            return self.hierarchy_lv2
 
     def hierarchical_topic_reduction(self, num_topics, interval=None):
         """
@@ -2061,7 +2168,7 @@ class Top2Vec:
                 top_sizes.append(combined_size)
 
             count += 1
-
+            print(num_topics_current)
             # update topic hierarchy
             smallest_inds = hierarchy.pop(smallest)
             if most_sim < smallest:
@@ -2096,6 +2203,128 @@ class Top2Vec:
         self._reorder_topics(hierarchy=True)
 
         return self.hierarchy
+
+    def hierarchical_topic_reduction_lv2(self, num_topics, interval=None):
+        """
+        Reduce the number of topics discovered by Top2Vec.
+
+        The most representative topics of the corpus will be found, by
+        iteratively merging each smallest topic to the most similar topic until
+        num_topics is reached.
+
+        Parameters
+        ----------
+        num_topics: int
+            The number of topics to reduce to.
+        interval: int (Optional, default None)
+            The interval at which to recalculate topic sizes. Larger values
+            will lead to faster computation but less accurate results.
+
+        Returns
+        -------
+        hierarchy: list of ints
+            Each index of hierarchy corresponds to the reduced topics, for each
+            reduced topic the indexes of the original topics that were merged
+            to create it are listed.
+
+            Example:
+            [[3]  <Reduced Topic 0> contains original Topic 3
+            [2,4] <Reduced Topic 1> contains original Topics 2 and 4
+            [0,1] <Reduced Topic 3> contains original Topics 0 and 1
+            ...]
+        """
+        self._validate_hierarchical_reduction_num_topics(num_topics)
+
+        num_topics_current = self.topic_vectors_reduced.shape[0]
+        top_vecs = self.topic_vectors_reduced
+        top_sizes = [self.topic_sizes_reduced[i] for i in range(0, len(self.topic_sizes_reduced))]
+        hierarchy_lv2 = [[i] for i in range(self.topic_vectors_reduced.shape[0])]
+
+        count = 0
+        if interval is None:
+            interval = max(int(self.document_vectors.shape[0] / 50000), 1)
+
+        while num_topics_current > num_topics:
+
+            # find smallest and most similar topics
+            smallest = np.argmin(top_sizes)
+            res = np.inner(top_vecs[smallest], top_vecs)
+            sims = np.flip(np.argsort(res))
+            most_sim = sims[1]
+            if most_sim == smallest:
+                most_sim = sims[0]
+
+            # calculate combined topic vector
+            top_vec_smallest = top_vecs[smallest]
+            smallest_size = top_sizes[smallest]
+
+            top_vec_most_sim = top_vecs[most_sim]
+            most_sim_size = top_sizes[most_sim]
+
+            combined_vec = self._l2_normalize(((top_vec_smallest * smallest_size) +
+                                               (top_vec_most_sim * most_sim_size)) / (smallest_size + most_sim_size))
+
+            # update topic vectors
+            ix_keep = list(range(len(top_vecs)))
+            ix_keep.remove(smallest)
+            ix_keep.remove(most_sim)
+            top_vecs = top_vecs[ix_keep]
+            top_vecs = np.vstack([top_vecs, combined_vec])
+            num_topics_current = top_vecs.shape[0]
+
+            # update topics sizes
+            if count % interval == 0:
+                doc_top = self._calculate_documents_topic(topic_vectors=top_vecs,
+                                                          document_vectors=self.document_vectors,
+                                                          dist=False)
+                topic_sizes = pd.Series(doc_top).value_counts()
+                top_sizes = [topic_sizes[i] if i in topic_sizes else 1 for i in range(0, top_vecs.shape[0])]
+
+            else:
+                smallest_size = top_sizes.pop(smallest)
+                if most_sim < smallest:
+                    most_sim_size = top_sizes.pop(most_sim)
+                else:
+                    most_sim_size = top_sizes.pop(most_sim - 1)
+                combined_size = smallest_size + most_sim_size
+                top_sizes.append(combined_size)
+
+            count += 1
+            print(num_topics_current)
+            # update topic hierarchy
+            smallest_inds = hierarchy_lv2.pop(smallest)
+            if most_sim < smallest:
+                most_sim_inds = hierarchy_lv2.pop(most_sim)
+            else:
+                most_sim_inds = hierarchy_lv2.pop(most_sim - 1)
+
+            combined_inds = smallest_inds + most_sim_inds
+            hierarchy_lv2.append(combined_inds)
+
+        # re-calculate topic vectors from clusters
+        doc_top = self._calculate_documents_topic(topic_vectors=top_vecs,
+                                                  document_vectors=self.document_vectors,
+                                                  dist=False)
+        self.topic_vectors_reduced_lv2 = self._l2_normalize(np.vstack([self.document_vectors
+                                                                   [np.where(doc_top == label)[0]]
+                                                                  .mean(axis=0) for label in set(doc_top)]))
+
+        self.hierarchy_lv2 = hierarchy_lv2
+
+        # assign documents to topic
+        self.doc_top_reduced_lv2, self.doc_dist_reduced_lv2 = self._calculate_documents_topic(self.topic_vectors_reduced_lv2,
+                                                                                      self.document_vectors)
+        # find topic words and scores
+        self.topic_words_reduced_lv2, self.topic_word_scores_reduced_lv2 = self._find_topic_words_and_scores(
+            topic_vectors=self.topic_vectors_reduced_lv2)
+
+        # calculate topic sizes
+        self.topic_sizes_reduced_lv2 = self._calculate_topic_sizes(hierarchy=True, reduction_level=2)
+
+        # re-order topics
+        self._reorder_topics(hierarchy=True, reduction_level=2)
+
+        return self.hierarchy_lv2
 
     def query_documents(self, query, num_docs, return_documents=True, use_index=False, ef=None, tokenizer=None):
         """
@@ -2173,7 +2402,7 @@ class Top2Vec:
         return self.search_documents_by_vector(query_vec, num_docs, return_documents=return_documents,
                                                use_index=use_index, ef=ef)
 
-    def query_topics(self, query, num_topics, reduced=False, tokenizer=None):
+    def query_topics(self, query, num_topics, reduced=False, tokenizer=None, reduction_level=1):
         """
         Semantic search of topics using text query.
 
@@ -2247,7 +2476,7 @@ class Top2Vec:
                                                 min_alpha=0.01,
                                                 epochs=100)
 
-        return self.search_topics_by_vector(query_vec, num_topics=num_topics, reduced=reduced)
+        return self.search_topics_by_vector(query_vec, num_topics=num_topics, reduced=reduced,reduction_level=reduction_level)
 
     def search_documents_by_vector(self, vector, num_docs, return_documents=True, use_index=False, ef=None):
         """
@@ -2390,7 +2619,7 @@ class Top2Vec:
 
         return words, word_scores
 
-    def search_topics_by_vector(self, vector, num_topics, reduced=False):
+    def search_topics_by_vector(self, vector, num_topics, reduced=False,reduction_level=1):
         """
         Semantic search of topics using keywords.
 
@@ -2445,12 +2674,20 @@ class Top2Vec:
         vector = self._l2_normalize(vector)
 
         if reduced:
-            self._validate_hierarchical_reduction()
+            if reduction_level==1:
+                self._validate_hierarchical_reduction()
 
-            topic_nums, topic_scores = self._search_vectors_by_vector(self.topic_vectors_reduced,
-                                                                      vector, num_topics)
-            topic_words = [self.topic_words_reduced[topic] for topic in topic_nums]
-            word_scores = [self.topic_word_scores_reduced[topic] for topic in topic_nums]
+                topic_nums, topic_scores = self._search_vectors_by_vector(self.topic_vectors_reduced,
+                                                                        vector, num_topics)
+                topic_words = [self.topic_words_reduced[topic] for topic in topic_nums]
+                word_scores = [self.topic_word_scores_reduced[topic] for topic in topic_nums]
+            else:
+                self._validate_hierarchical_reduction(reduction_level=2)
+
+                topic_nums, topic_scores = self._search_vectors_by_vector(self.topic_vectors_reduced_lv2,
+                                                                        vector, num_topics)
+                topic_words = [self.topic_words_reduced_lv2[topic] for topic in topic_nums]
+                word_scores = [self.topic_word_scores_reduced_lv2[topic] for topic in topic_nums]
 
         else:
             topic_nums, topic_scores = self._search_vectors_by_vector(self.topic_vectors,
@@ -2460,7 +2697,7 @@ class Top2Vec:
 
         return topic_words, word_scores, topic_scores, topic_nums
 
-    def search_documents_by_topic(self, topic_num, num_docs, return_documents=True, reduced=False):
+    def search_documents_by_topic(self, topic_num, num_docs, return_documents=True, reduced=False, reduction_level=1):
         """
         Get the most semantically similar documents to the topic.
 
@@ -2502,16 +2739,26 @@ class Top2Vec:
         """
 
         if reduced:
-            self._validate_hierarchical_reduction()
-            self._validate_topic_num(topic_num, reduced)
-            self._validate_topic_search(topic_num, num_docs, reduced)
+            if reduction_level==1:
+                self._validate_hierarchical_reduction()
+                self._validate_topic_num(topic_num, reduced)
+                self._validate_topic_search(topic_num, num_docs, reduced)
 
-            topic_document_indexes = np.where(self.doc_top_reduced == topic_num)[0]
-            topic_document_indexes_ordered = np.flip(np.argsort(self.doc_dist_reduced[topic_document_indexes]))
-            doc_indexes = topic_document_indexes[topic_document_indexes_ordered][0:num_docs]
-            doc_scores = self.doc_dist_reduced[doc_indexes]
-            doc_ids = self._get_document_ids(doc_indexes)
+                topic_document_indexes = np.where(self.doc_top_reduced == topic_num)[0]
+                topic_document_indexes_ordered = np.flip(np.argsort(self.doc_dist_reduced[topic_document_indexes]))
+                doc_indexes = topic_document_indexes[topic_document_indexes_ordered][0:num_docs]
+                doc_scores = self.doc_dist_reduced[doc_indexes]
+                doc_ids = self._get_document_ids(doc_indexes)
+            else: 
+                self._validate_hierarchical_reduction(reduction_level=2)
+                self._validate_topic_num(topic_num, reduced, reduction_level=2)
+                self._validate_topic_search(topic_num, num_docs, reduced, reduction_level=2)
 
+                topic_document_indexes = np.where(self.doc_top_reduced_lv2 == topic_num)[0]
+                topic_document_indexes_ordered = np.flip(np.argsort(self.doc_dist_reduced_lv2[topic_document_indexes]))
+                doc_indexes = topic_document_indexes[topic_document_indexes_ordered][0:num_docs]
+                doc_scores = self.doc_dist_reduced_lv2[doc_indexes]
+                doc_ids = self._get_document_ids(doc_indexes)
         else:
 
             self._validate_topic_num(topic_num, reduced)
@@ -2688,7 +2935,7 @@ class Top2Vec:
 
         return words, word_scores
 
-    def search_topics(self, keywords, num_topics, keywords_neg=None, reduced=False):
+    def search_topics(self, keywords, num_topics, keywords_neg=None, reduced=False, reduction_level=1):
         """
         Semantic search of topics using keywords.
 
@@ -2752,7 +2999,7 @@ class Top2Vec:
         neg_word_vecs = self._words2word_vectors(keywords_neg)
         combined_vector = self._get_combined_vec(word_vecs, neg_word_vecs)
 
-        return self.search_topics_by_vector(combined_vector, num_topics=num_topics, reduced=reduced)
+        return self.search_topics_by_vector(combined_vector, num_topics=num_topics, reduced=reduced, reduction_level=reduction_level)
 
     def search_documents_by_documents(self, doc_ids, num_docs, doc_ids_neg=None, return_documents=True,
                                       use_index=False, ef=None):
@@ -2859,7 +3106,7 @@ class Top2Vec:
         else:
             return doc_scores, doc_ids
 
-    def generate_topic_wordcloud(self, topic_num, background_color="black", reduced=False):
+    def generate_topic_wordcloud(self, topic_num, background_color="black", reduced=False, reduction_level=1):
         """
         Create a word cloud for a topic.
 
@@ -2891,9 +3138,14 @@ class Top2Vec:
 
         if reduced:
             self._validate_hierarchical_reduction()
-            self._validate_topic_num(topic_num, reduced)
-            word_score_dict = dict(zip(self.topic_words_reduced[topic_num],
+            if reduction_level == 1:
+                self._validate_topic_num(topic_num, reduced)
+                word_score_dict = dict(zip(self.topic_words_reduced[topic_num],
                                        softmax(self.topic_word_scores_reduced[topic_num])))
+            else: 
+                self._validate_topic_num(topic_num, reduced, reduction_level=2)
+                word_score_dict = dict(zip(self.topic_words_reduced_lv2[topic_num],
+                                       softmax(self.topic_word_scores_reduced_lv2[topic_num])))
         else:
             self._validate_topic_num(topic_num, reduced)
             word_score_dict = dict(zip(self.topic_words[topic_num],
